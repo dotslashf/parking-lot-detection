@@ -25,7 +25,7 @@ sender = imagezmq.ImageSender(connect_to="tcp://{}:5555".format(
 # camera sensor to warmup
 rpiName = socket.gethostname()
 #vs = VideoStream(src=0).start()
-fvs = FileVideoStream("./video/test2-cut.avi").start()
+fvs = FileVideoStream("./video/example-1.mp4").start()
 time.sleep(2.0)
 
 while True:
