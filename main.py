@@ -195,6 +195,7 @@ while True:
                 if len(carList) > nc:
                     carList.popitem()
 
+
     # export data car to csv
     with open('car.csv', 'a') as csvfile:
         filewriter = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -233,6 +234,27 @@ while True:
             cv2.rectangle(frame, (parkList[i].x, parkList[i].y), (parkList[i].xend, parkList[i].yend), (0, 255, 0), 2)
         # put text
             cv2.putText(frame, "Parking Slot: {0}".format(parkList[i].no), (parkList[i].x, parkList[i].y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+
+    # show info about cars
+    for ic, car in carList.items():
+        print("\n*************************",
+        "\n| Car Id:", car.no,
+        "\n| Car x, y:", car.x, car.y,
+        "\n| Car xend, yend:", car.xend, car.yend,
+        "\n*************************")
+
+    # show info park list in bash
+    for i in range(len(parkList)):
+        # print out info for parking slot and car
+        print("Parking Slot:", parkList[i].no,
+              "\n======================",
+              "\n| x and y: ", parkList[i].x, ",", parkList[i].y,
+              "\n| x end: ", parkList[i].xend,",", parkList[i].yend,
+              "\n| Kosong?: ", ksg, 
+              "\n| Mobil no: ", parkList[i].carID,
+              "\n| Jam Isi: ", parkList[i].dateFill,
+                  "\n| Jam Kosong: ", parkList[i].dateOut,
+            "\n======================")
 
     # name of webcam
     cv2.putText(frame, rpiName, (10, 25),
