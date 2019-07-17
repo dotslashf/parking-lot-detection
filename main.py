@@ -15,6 +15,9 @@ ap.add_argument("-m", "--model", default="./MobileNetSSD_deploy.caffemodel",
 ap.add_argument("-c", "--confidence", type=float, default=0.2, help="minimum probability to filter weak detections")
 args = vars(ap.parse_args())
 
+parkFile = open("parking.txt", "w+")
+carFile = open("car.txt", "w+")
+
 # initialize ImageHub
 imageHub = imagezmq.ImageHub()
 
@@ -40,8 +43,11 @@ class parkSlot():
         self.yend = yend
         self.size = size
         self.kosong = True
-        self.isinya = None
+        self.carID = None
         self.xandy = (0, 0)
+        self.dateNow = None
+        self.dateFill = None
+        self.dateOut = None
 
     # assign a parkslot based on list of all car
     def assignSpot(self, carList):
@@ -49,14 +55,25 @@ class parkSlot():
             if car.xend in range(self.x, self.xend) and car.y in range(self.y, self.yend):
                 self.kosong = False
                 self.xandy = (car.xend, car.y)
-                self.isinya = car.no
+                self.carID = car.no
 
     # scan spot if there is a car or not
     def scanSpot(self, carList):
         for i, car in carList.items():
             if self.xandy[0] != car.xend and self.xandy[1] != car.y:
                 self.kosong = True
-                self.isinya = None
+                self.carID = None
+
+    def assignDate(self):
+        self.dateNow = datetime.now().strftime('%H:%M:%S')
+
+    def dateKosongTidak(self):
+        if self.kosong == True:
+            self.dateFill = None
+            self.dateOut = datetime.now().strftime('%H:%M:%S')
+        elif self.kosong == False:
+            self.dateFill = datetime.now().strftime('%H:%M:%S')
+            self.dateOut = None
 
 # class object for car
 class Car():
@@ -88,6 +105,8 @@ def initializePark(event, x, y, flags, param):
         no = len(parkList)+1
 
         parkList.append(parkSlot(no, start[0][0], start[0][1], end[0][0], end[0][1], size))
+        parkList[-1].assignDate()
+
 
 # calling method for drawing for window
 def drawMode(event, x, y, flags, param):
@@ -122,6 +141,8 @@ while True:
     # receive RPi name and frame from the RPi and ack
     (rpiName, frame) = imageHub.recv_image()
     imageHub.send_reply(b'OK')
+
+    dtnow = datetime.now().strftime('%H:%M:%S %a-%b-%d')
 
     if rpiName not in lastActive.keys():
         print("[INFO] receiving data from {}...".format(rpiName))
@@ -179,17 +200,27 @@ while True:
     # info about cars
     for ic, car in carList.items():
         print("\n*************************",
-            "\n| Car Id:", car.no,
+        "\n| Car Id:", car.no,
         "\n| Car x, y:", car.x, car.y,
         "\n| Car xend, yend:", car.xend, car.yend,
-            "\n*************************")
+        "\n*************************")
+
+        carFile.write("*************************" + 
+        "\nCar ID: " + str(car.no) +
+        "\n| Car x, y: " + str(car.x) + " , " + str(car.y) +
+        "\n| Car xend, yend: " + str(car.xend) + " , " + str(car.yend) +
+        "\r\n")
 
     # draw park slot
     for i in range(len(parkList)):
         # scan if there is a car or not from the parkList
         parkList[i].scanSpot(carList)
+
         # assign a car to parkSlot if the criteria is meet
         parkList[i].assignSpot(carList)
+
+        # check date
+        parkList[i].dateKosongTidak()
 
         if parkList[i].kosong == True:
             ksg = "Iya"
@@ -203,20 +234,32 @@ while True:
               "\n| y: ", parkList[i].y,
               "\n| x end: ", parkList[i].xend,
               "\n| y end: ", parkList[i].yend,
-              "\n| size: ", parkList[i].size,
               "\n| Kosong?: ", ksg, 
-              "\n| Isinya?: ", parkList[i].isinya,
-              "\n| Car dot position: ", parkList[i].xandy,
+              "\n| Mobil no: ", parkList[i].carID,
             "\n======================")
+
+        parkFile.write("Parking Slot: " + str(parkList[i].no) +
+        "\n| x and y: " + str(parkList[i].x) + " , " + str(parkList[i].y) +
+        "\n| xend and yend: " + str(parkList[i].xend) + " , " + str(parkList[i].yend) + 
+        "\n| Kosong?: " + ksg +
+        "\n| Mobil no: " + str(parkList[i].carID) + 
+        "\n| Jam Isi: " + str(parkList[i].dateFill) + 
+        "\n| Jam Kosong: " + str(parkList[i].dateOut) +
+        "\r\n")
 
         # draw rectangle (bounding box) for park slot
         cv2.rectangle(frame, (parkList[i].x, parkList[i].y), (parkList[i].xend, parkList[i].yend), (0, 255, 0), 2)
         # put text
         cv2.putText(frame, "Parking Slot: {0}".format(parkList[i].no), (parkList[i].x, parkList[i].y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
 
+    # name of webcam
     cv2.putText(frame, rpiName, (10, 25),
 		cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
+    # date now
+    cv2.putText(frame, dtnow, (w - 180, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+
+    # obj counter
     label = ", ".join("{}: {}".format(obj, count) for (obj, count) in objCount.items())
     cv2.putText(frame, label, (10, h - 20),
 		cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255,0), 2)
@@ -240,8 +283,6 @@ while True:
     if key == ord("q"):
         break
 
+parkFile.close()
+carFile.close()
 cv2.destroyAllWindows()
-
-    
-
-
