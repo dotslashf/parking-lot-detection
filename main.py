@@ -230,12 +230,12 @@ while True:
         # print out info for parking slot and car
         print("Parking Slot:", parkList[i].no,
               "\n======================",
-              "\n| x: ", parkList[i].x,
-              "\n| y: ", parkList[i].y,
-              "\n| x end: ", parkList[i].xend,
-              "\n| y end: ", parkList[i].yend,
+              "\n| x and y: ", parkList[i].x, ",", parkList[i].y,
+              "\n| x end: ", parkList[i].xend,",", parkList[i].yend,
               "\n| Kosong?: ", ksg, 
               "\n| Mobil no: ", parkList[i].carID,
+              "\n| Jam Isi: ", parkList[i].dateFill,
+                  "\n| Jam Kosong: ", parkList[i].dateOut,
             "\n======================")
 
         parkFile.write("Parking Slot: " + str(parkList[i].no) +
