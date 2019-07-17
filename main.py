@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime
 from imagezmq import imagezmq
 import imutils
+import csv
 
 # argument parser
 ap = argparse.ArgumentParser()
@@ -14,9 +15,6 @@ ap.add_argument("-m", "--model", default="./MobileNetSSD_deploy.caffemodel",
                 help="path to Caffe pretrained model")
 ap.add_argument("-c", "--confidence", type=float, default=0.2, help="minimum probability to filter weak detections")
 args = vars(ap.parse_args())
-
-parkFile = open("parking.txt", "w+")
-carFile = open("car.txt", "w+")
 
 # initialize ImageHub
 imageHub = imagezmq.ImageHub()
@@ -142,7 +140,7 @@ while True:
     (rpiName, frame) = imageHub.recv_image()
     imageHub.send_reply(b'OK')
 
-    dtnow = datetime.now().strftime('%H:%M:%S %a-%b-%d')
+    dtnow = datetime.now().strftime('%H:%M:%S %a-%d-%b')
 
     if rpiName not in lastActive.keys():
         print("[INFO] receiving data from {}...".format(rpiName))
@@ -150,7 +148,7 @@ while True:
     lastActive[rpiName] = datetime.now()
 
     # create frame from the client
-    frame = imutils.resize(frame, width=360)
+    frame = imutils.resize(frame, width=480)
     (h, w) = frame.shape[:2]
 
     # blob for cnn
@@ -197,7 +195,47 @@ while True:
                 if len(carList) > nc:
                     carList.popitem()
 
-    # info about cars
+
+    # export data car to csv
+    with open('car.csv', 'a') as csvfile:
+        filewriter = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+        # looping for each car
+        for ic, car in carList.items():
+
+            xy = (car.x, car.y)
+            xy_end = (car.xend, car.yend)
+
+            # write to csv
+            filewriter.writerow([dtnow, car.no, xy, xy_end])
+
+    # draw window and export data parking to csv
+    with open('parking.csv', 'a') as csvfile:
+        filewriter = csv.writer(csvfile, delimiter=',',quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+        # looping for each park slot
+        for i in range(len(parkList)):
+            parkList[i].scanSpot(carList)
+            parkList[i].assignSpot(carList)
+            parkList[i].dateKosongTidak()
+
+            xy = (parkList[i].x, parkList[i].y)
+            xy_end = (parkList[i].xend, parkList[i].yend)
+
+            if parkList[i].kosong == True:
+                ksg = "Iya"
+            else:
+                ksg = "Tidak"
+            
+            # write to csv
+            filewriter.writerow([dtnow, i+1, xy, xy_end, ksg, parkList[i].carID, parkList[i].dateNow, parkList[i].dateFill, parkList[i].dateOut])
+
+        # draw rectangle (bounding box) for park slot
+            cv2.rectangle(frame, (parkList[i].x, parkList[i].y), (parkList[i].xend, parkList[i].yend), (0, 255, 0), 2)
+        # put text
+            cv2.putText(frame, "Parking Slot: {0}".format(parkList[i].no), (parkList[i].x, parkList[i].y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+
+    # show info about cars
     for ic, car in carList.items():
         print("\n*************************",
         "\n| Car Id:", car.no,
@@ -205,52 +243,18 @@ while True:
         "\n| Car xend, yend:", car.xend, car.yend,
         "\n*************************")
 
-        carFile.write("*************************" + 
-        "\nCar ID: " + str(car.no) +
-        "\n| Car x, y: " + str(car.x) + " , " + str(car.y) +
-        "\n| Car xend, yend: " + str(car.xend) + " , " + str(car.yend) +
-        "\r\n")
-
-    # draw park slot
+    # show info park list in bash
     for i in range(len(parkList)):
-        # scan if there is a car or not from the parkList
-        parkList[i].scanSpot(carList)
-
-        # assign a car to parkSlot if the criteria is meet
-        parkList[i].assignSpot(carList)
-
-        # check date
-        parkList[i].dateKosongTidak()
-
-        if parkList[i].kosong == True:
-            ksg = "Iya"
-        else:
-            ksg = "Tidak"
-        
         # print out info for parking slot and car
         print("Parking Slot:", parkList[i].no,
               "\n======================",
-              "\n| x: ", parkList[i].x,
-              "\n| y: ", parkList[i].y,
-              "\n| x end: ", parkList[i].xend,
-              "\n| y end: ", parkList[i].yend,
+              "\n| x and y: ", parkList[i].x, ",", parkList[i].y,
+              "\n| x end: ", parkList[i].xend,",", parkList[i].yend,
               "\n| Kosong?: ", ksg, 
               "\n| Mobil no: ", parkList[i].carID,
+              "\n| Jam Isi: ", parkList[i].dateFill,
+                  "\n| Jam Kosong: ", parkList[i].dateOut,
             "\n======================")
-
-        parkFile.write("Parking Slot: " + str(parkList[i].no) +
-        "\n| x and y: " + str(parkList[i].x) + " , " + str(parkList[i].y) +
-        "\n| xend and yend: " + str(parkList[i].xend) + " , " + str(parkList[i].yend) + 
-        "\n| Kosong?: " + ksg +
-        "\n| Mobil no: " + str(parkList[i].carID) + 
-        "\n| Jam Isi: " + str(parkList[i].dateFill) + 
-        "\n| Jam Kosong: " + str(parkList[i].dateOut) +
-        "\r\n")
-
-        # draw rectangle (bounding box) for park slot
-        cv2.rectangle(frame, (parkList[i].x, parkList[i].y), (parkList[i].xend, parkList[i].yend), (0, 255, 0), 2)
-        # put text
-        cv2.putText(frame, "Parking Slot: {0}".format(parkList[i].no), (parkList[i].x, parkList[i].y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
 
     # name of webcam
     cv2.putText(frame, rpiName, (10, 25),
@@ -268,21 +272,10 @@ while True:
 
     key = cv2.waitKey(50) & 0xFF
 
-    if (datetime.now() - lastActiveCheck).seconds > ACTIVATE_CHECK_SECONDS:
-        for (rpiName, ts) in list(lastActive.items()):
-            if (datetime.now() -ts).seconds > ACTIVATE_CHECK_SECONDS:
-                print("[INFO] lost connection to {}".format(rpiName))
-                lasActive.pop(rpiName)
-                frameDict.pop(rpiName)
-
-        lastActiveCheck = datetime.now()
-
     # callback function for drawing parking slot
     cv2.setMouseCallback("Monitor Parkiran", drawMode)
     cv2.imshow("Monitor Parkiran", frame)
     if key == ord("q"):
         break
 
-parkFile.close()
-carFile.close()
 cv2.destroyAllWindows()
