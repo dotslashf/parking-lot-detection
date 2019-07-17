@@ -250,15 +250,6 @@ while True:
 
     key = cv2.waitKey(50) & 0xFF
 
-    if (datetime.now() - lastActiveCheck).seconds > ACTIVATE_CHECK_SECONDS:
-        for (rpiName, ts) in list(lastActive.items()):
-            if (datetime.now() -ts).seconds > ACTIVATE_CHECK_SECONDS:
-                print("[INFO] lost connection to {}".format(rpiName))
-                lasActive.pop(rpiName)
-                frameDict.pop(rpiName)
-
-        lastActiveCheck = datetime.now()
-
     # callback function for drawing parking slot
     cv2.setMouseCallback("Monitor Parkiran", drawMode)
     cv2.imshow("Monitor Parkiran", frame)
