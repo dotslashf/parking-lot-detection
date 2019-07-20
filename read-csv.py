@@ -1,15 +1,18 @@
-import time
+import pandas as pd
 import csv
+import time
 
-with open('parking.csv', mode='r') as csv_file:
-    csv_reader = csv.DictReader(csv_file)
-    line_count = 0
-    for row in csv_reader:
-        if line_count == 0:
-            print(f'Column names are {", ".join(row)}')
-            line_count += 1
-        if row[" no"] == "1":
-            print(f'{row["date"]} | Slot Park: {row[" no"]} | Kosong?: {row[" kosong"]} | Jam Isi: {row[" jam isi"]} | Jam Kosong: {row[" jam kosong"]}')
-            print("-------------------------------------------------------------------------------------")
-        line_count += 1
-    print(f'Processed {line_count} lines.')
+filename = "car.csv"
+
+with open(filename, "r") as f:
+    reader = csv.reader(f,delimiter = ",")
+    data = list(reader)
+    row_count = len(data)
+    header = data[0]
+
+#data.list_datasets()
+
+while True:
+    for data in pd.read_csv(filename, skiprows = row_count - 10, names=["Date", "NO ID", "X Y", "XEND YEND"]):
+        data.list_datasets()
+    time.sleep(1)

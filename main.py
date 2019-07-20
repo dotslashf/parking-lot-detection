@@ -128,10 +128,6 @@ frameDict = {}
 lastActive = {}
 lastActiveCheck = datetime.now()
 
-ESTIMATED_NUM_PIS = 1
-ACTIVATE_CHECK_PERIOD = 5
-ACTIVATE_CHECK_SECONDS = ESTIMATED_NUM_PIS * ACTIVATE_CHECK_PERIOD
-
 # printout the detected obj in command line
 print("[INFO] detecting: {}...".format(", ".join(obj for obj in CONSIDER)))
 
@@ -163,30 +159,42 @@ while True:
     # detection
     for i in np.arange(0, detections.shape[2]):
         # extract the confidence (i.e., probability) associated with
-		# the prediction
+        # the prediction
         confidence = detections[0, 0, i, 2]
 
         # filter out weak detections by ensuring the confidence is
-		# greater than the minimum confidence
+        # greater than the minimum confidence
         if confidence > args["confidence"]:
             # extract the index of the class label from the
-			# detections
+            # detections
             idx = int(detections[0, 0, i, 1])
 
             # check to see if the predicted class is in the set of
-			# classes that need to be considered
+            # classes that need to be considered
             if CLASSES[idx] in CONSIDER:
                 # increment the count of the particular object
-				# detected in the frame
+                # detected in the frame
                 
                 objCount[CLASSES[idx]] += 1
 
                 # compute the (x, y)-coordinates of the bounding box
-				# for the object             
+                # for the object             
                 # and draw the rectangle
                 box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
                 (x, y, xend, yend) = box.astype("int")
-                cv2.rectangle(frame, (x, y), (xend, yend), (0, 0, 255), 2)
+                cv2.rectangle(frame, (x, y), (xend, yend), (255, 0, 0), 2)
+
+                # put confidence level of object
+                kelas = "{}: {:.2f}%".format(CLASSES[idx],confidence * 100)
+
+                # location of text
+                if y - 15 > 15:
+                    yend = y - 15
+                else:
+                    yend = y + 15
+
+                # put text
+                cv2.putText(frame, kelas, (x, yend), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
                 # create object car
                 nc = objCount[CLASSES[idx]]
@@ -230,10 +238,15 @@ while True:
             # write to csv
             filewriter.writerow([dtnow, i+1, xy, xy_end, ksg, parkList[i].carID, parkList[i].dateNow, parkList[i].dateFill, parkList[i].dateOut])
 
-        # draw rectangle (bounding box) for park slot
-            cv2.rectangle(frame, (parkList[i].x, parkList[i].y), (parkList[i].xend, parkList[i].yend), (0, 255, 0), 2)
-        # put text
-            cv2.putText(frame, "Parking Slot: {0}".format(parkList[i].no), (parkList[i].x, parkList[i].y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+            if parkList[i].kosong == True:
+                color = (0, 255, 0)
+            else:
+                color = (0, 0, 255)
+
+            # draw rectangle (bounding box) for park slot
+            cv2.rectangle(frame, (parkList[i].x, parkList[i].y), (parkList[i].xend, parkList[i].yend), color, 2)
+            # put text
+            cv2.putText(frame, "Slot: {}".format(parkList[i].no), (parkList[i].x, parkList[i].y -15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 2)
 
     # show info about cars
     for ic, car in carList.items():
@@ -246,6 +259,12 @@ while True:
     # show info park list in bash
     for i in range(len(parkList)):
         # print out info for parking slot and car
+
+        if parkList[i].kosong == True:
+            ksg = "Iya"
+        else:
+            ksg = "Tidak"
+
         print("Parking Slot:", parkList[i].no,
               "\n======================",
               "\n| x and y: ", parkList[i].x, ",", parkList[i].y,
@@ -258,7 +277,7 @@ while True:
 
     # name of webcam
     cv2.putText(frame, rpiName, (10, 25),
-		cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
     # date now
     cv2.putText(frame, dtnow, (w - 180, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
@@ -266,7 +285,7 @@ while True:
     # obj counter
     label = ", ".join("{}: {}".format(obj, count) for (obj, count) in objCount.items())
     cv2.putText(frame, label, (10, h - 20),
-		cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255,0), 2)
+        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255,0), 2)
 
     frameDict[rpiName] = frame
 
