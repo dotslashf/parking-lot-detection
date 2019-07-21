@@ -6,6 +6,7 @@ from datetime import datetime
 from imagezmq import imagezmq
 import imutils
 import csv
+from terminaltables import SingleTable
 
 # argument parser
 ap = argparse.ArgumentParser()
@@ -13,7 +14,7 @@ ap.add_argument("-p", "--prototxt", default="./MobileNetSSD_deploy.prototxt",
                 help="path to Caffe prototxt file")
 ap.add_argument("-m", "--model", default="./MobileNetSSD_deploy.caffemodel",
                 help="path to Caffe pretrained model")
-ap.add_argument("-c", "--confidence", type=float, default=0.2, help="minimum probability to filter weak detections")
+ap.add_argument("-c", "--confidence", type=float, default=0.7, help="minimum probability to filter weak detections")
 args = vars(ap.parse_args())
 
 # initialize ImageHub
@@ -27,6 +28,10 @@ parkList = [] # parklist is list from parkSlot
 carList = {} # carList is list contains car
 modeDraw = "parkir"
 ksg = ""
+#tableParkiran = []
+tableParkiran = [
+    ['Slot', 'Status', 'Mobil ID', 'Jam Isi', 'Jam Kosong']
+]
 
 # named window for monitoring
 cv2.namedWindow("Monitor Parkiran")
@@ -101,8 +106,9 @@ def initializePark(event, x, y, flags, param):
         size = (size_x, size_y)
 
         no = len(parkList)+1
-
+        ind = len(parkList)
         parkList.append(parkSlot(no, start[0][0], start[0][1], end[0][0], end[0][1], size))
+        tableParkiran.insert(len(parkList), ["---", "---", "---", "---", "---"])
         parkList[-1].assignDate()
 
 
@@ -131,7 +137,15 @@ lastActiveCheck = datetime.now()
 # printout the detected obj in command line
 print("[INFO] detecting: {}...".format(", ".join(obj for obj in CONSIDER)))
 
+
+
 while True:
+     
+    table = SingleTable(tableParkiran)
+    table.title = "Table Parkiran"
+    table.inner_row_border = False
+    print(table.table)
+
     # receive RPi name and frame from the RPi and ack
     (rpiName, frame) = imageHub.recv_image()
     imageHub.send_reply(b'OK')
@@ -193,7 +207,7 @@ while True:
                 else:
                     yend = y + 15
 
-                # put text
+                # put text confidence level
                 cv2.putText(frame, kelas, (x, yend), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
                 # create object car
@@ -203,77 +217,71 @@ while True:
                 if len(carList) > nc:
                     carList.popitem()
 
-
     # export data car to csv
-    with open('car.csv', 'a') as csvfile:
-        filewriter = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    # with open('car.csv', 'a') as csvfile:
+    #     filewriter = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
-        # looping for each car
-        for ic, car in carList.items():
+    #     # looping for each car
+    #     for ic, car in carList.items():
 
-            xy = (car.x, car.y)
-            xy_end = (car.xend, car.yend)
+    #         xy = (car.x, car.y)
+    #         xy_end = (car.xend, car.yend)
 
-            # write to csv
-            filewriter.writerow([dtnow, car.no, xy, xy_end])
+    #         # write to csv
+    #         filewriter.writerow([dtnow, car.no, xy, xy_end])
 
     # draw window and export data parking to csv
-    with open('parking.csv', 'a') as csvfile:
-        filewriter = csv.writer(csvfile, delimiter=',',quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    # looping for each park slot
 
-        # looping for each park slot
-        for i in range(len(parkList)):
-            parkList[i].scanSpot(carList)
-            parkList[i].assignSpot(carList)
-            parkList[i].dateKosongTidak()
+    for i in range(len(parkList)):
+        parkList[i].scanSpot(carList)
+        parkList[i].assignSpot(carList)
+        parkList[i].dateKosongTidak()
 
-            xy = (parkList[i].x, parkList[i].y)
-            xy_end = (parkList[i].xend, parkList[i].yend)
+        xy = (parkList[i].x, parkList[i].y)
+        xy_end = (parkList[i].xend, parkList[i].yend)
 
-            if parkList[i].kosong == True:
-                ksg = "Iya"
-            else:
-                ksg = "Tidak"
-            
-            # write to csv
-            filewriter.writerow([dtnow, i+1, xy, xy_end, ksg, parkList[i].carID, parkList[i].dateNow, parkList[i].dateFill, parkList[i].dateOut])
+        # update tabel parkList
+        if parkList[i].kosong == True:
+            ksg = "Kosong"
+            color = (0, 255, 0)
+        else:
+            ksg = "Terisi"
+            color = (0, 0, 255)
+        if parkList[i].dateFill == None:
+            inn = "-----"
+        else:
+            inn = parkList[i].dateFill
+        if parkList[i].dateOut == None:
+            out = "-----"
+        else:
+            out = parkList[i].dateOut
+        if parkList[i].carID == None:
+            mbl = "-----"
+        else:
+            mbl = parkList[i].carID
 
-            if parkList[i].kosong == True:
-                color = (0, 255, 0)
-            else:
-                color = (0, 0, 255)
+        tableParkiran[i+1] = [i+1, ksg, mbl, inn, out]
 
-            # draw rectangle (bounding box) for park slot
-            cv2.rectangle(frame, (parkList[i].x, parkList[i].y), (parkList[i].xend, parkList[i].yend), color, 2)
-            # put text
-            cv2.putText(frame, "Slot: {}".format(parkList[i].no), (parkList[i].x, parkList[i].y -15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 2)
+        # draw rectangle (bounding box) for park slot
+        cv2.rectangle(frame, (parkList[i].x, parkList[i].y), (parkList[i].xend, parkList[i].yend), color, 2)
+        # put text
+        cv2.putText(frame, "Slot: {}".format(parkList[i].no), (parkList[i].x, parkList[i].y -15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 2)
+
+    # with open('parking.csv', 'a') as csvfile:
+    #     filewriter = csv.writer(csvfile, delimiter=',',quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+    #     # write to csv
+    #     filewriter.writerow([dtnow, i+1, xy, xy_end, ksg, parkList[i].carID, parkList[i].dateNow, parkList[i].dateFill, parkList[i].dateOut])
+
 
     # show info about cars
-    for ic, car in carList.items():
-        print("\n*************************",
-        "\n| Car Id:", car.no,
-        "\n| Car x, y:", car.x, car.y,
-        "\n| Car xend, yend:", car.xend, car.yend,
-        "\n*************************")
-
-    # show info park list in bash
-    for i in range(len(parkList)):
-        # print out info for parking slot and car
-
-        if parkList[i].kosong == True:
-            ksg = "Iya"
-        else:
-            ksg = "Tidak"
-
-        print("Parking Slot:", parkList[i].no,
-              "\n======================",
-              "\n| x and y: ", parkList[i].x, ",", parkList[i].y,
-              "\n| x end: ", parkList[i].xend,",", parkList[i].yend,
-              "\n| Kosong?: ", ksg, 
-              "\n| Mobil no: ", parkList[i].carID,
-              "\n| Jam Isi: ", parkList[i].dateFill,
-                  "\n| Jam Kosong: ", parkList[i].dateOut,
-            "\n======================")
+    # for ic, car in carList.items():
+    #     print("\n*************************",
+    #     "\n| Car Id:", car.no,
+    #     "\n| Car x, y:", car.x, car.y,
+    #     "\n| Car xend, yend:", car.xend, car.yend,
+    #     "\n*************************")
 
     # name of webcam
     cv2.putText(frame, rpiName, (10, 25),
